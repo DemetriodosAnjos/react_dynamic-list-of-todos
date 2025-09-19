@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import 'bulma/css/bulma.css';
 import '@fortawesome/fontawesome-free/css/all.css';
 
@@ -13,52 +13,70 @@ import { Loader } from './components/Loader';
 
 export const App: React.FC = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
-  const [filteredTodos, setFilteredTodos] = useState<Todo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
   const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isUserLoading, setIsUserLoading] = useState(false);
+
   const [statusFilter, setStatusFilter] = useState('all');
   const [query, setQuery] = useState('');
 
+  // ref para controlar solicitações de usuário
+  const userRequestRef = useRef(0);
+
   useEffect(() => {
     getTodos()
-      .then(data => {
-        setTodos(data);
-        setFilteredTodos(data);
-      })
+      .then(setTodos)
       .finally(() => setIsLoading(false));
   }, []);
 
-  useEffect(() => {
-    let result = [...todos];
+  const visibleTodos = useMemo(() => {
+    return todos.filter(todo => {
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'completed' && todo.completed) ||
+        (statusFilter === 'active' && !todo.completed);
 
-    if (statusFilter === 'completed') {
-      result = result.filter(todo => todo.completed);
-    } else if (statusFilter === 'active') {
-      result = result.filter(todo => !todo.completed);
-    }
+      const matchesQuery = todo.title
+        .toLowerCase()
+        .includes(query.toLowerCase());
 
-    if (query.trim()) {
-      result = result.filter(todo =>
-        todo.title.toLowerCase().includes(query.toLowerCase()),
-      );
-    }
-
-    setFilteredTodos(result);
-  }, [statusFilter, query, todos]);
+      return matchesStatus && matchesQuery;
+    });
+  }, [todos, statusFilter, query]);
 
   const handleSelectTodo = (todo: Todo) => {
+    // invalida qualquer fetch anterior
+    userRequestRef.current += 1;
+    const thisRequestId = userRequestRef.current;
+
     setSelectedTodo(todo);
+    setSelectedUser(null);
     setIsUserLoading(true);
+
     getUser(todo.userId)
-      .then(user => setSelectedUser(user))
-      .finally(() => setIsUserLoading(false));
+      .then(user => {
+        // só atualiza se for a requisição corrente
+        if (userRequestRef.current === thisRequestId) {
+          setSelectedUser(user);
+          setIsUserLoading(false);
+        }
+      })
+      .catch(() => {
+        if (userRequestRef.current === thisRequestId) {
+          setIsUserLoading(false);
+        }
+      });
   };
 
   const handleCloseModal = () => {
+    // invalida qualquer fetch pendente
+    userRequestRef.current += 1;
+
     setSelectedTodo(null);
     setSelectedUser(null);
+    setIsUserLoading(false);
   };
 
   return (
@@ -83,7 +101,7 @@ export const App: React.FC = () => {
                 <Loader />
               ) : (
                 <TodoList
-                  todos={filteredTodos}
+                  todos={visibleTodos}
                   onSelect={handleSelectTodo}
                   selectedTodo={selectedTodo}
                 />
