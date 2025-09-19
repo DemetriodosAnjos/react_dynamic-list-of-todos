@@ -1,3 +1,4 @@
+// src/components/TodoModal/TodoModal.tsx
 import React from 'react';
 import classNames from 'classnames';
 import { Todo } from '../../types/Todo';
@@ -21,8 +22,20 @@ export const TodoModal: React.FC<Props> = ({
     <div className="modal is-active" data-cy="modal">
       <div className="modal-background" onClick={onClose} />
 
-      {isLoading || !user ? (
+      {isLoading ? (
         <Loader />
+      ) : !user ? (
+        <div className="modal-card" data-cy="modal-error">
+          <header className="modal-card-head">
+            <p className="modal-card-title">Falha ao carregar o usuário</p>
+            <button
+              type="button"
+              className="delete"
+              aria-label="Close error"
+              onClick={onClose}
+            />
+          </header>
+        </div>
       ) : (
         <div className="modal-card">
           <header className="modal-card-head">
@@ -32,8 +45,6 @@ export const TodoModal: React.FC<Props> = ({
             >
               Todo #{todo.id}
             </div>
-
-            {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
             <button
               type="button"
               className="delete"
@@ -55,11 +66,8 @@ export const TodoModal: React.FC<Props> = ({
                 })}
               >
                 {todo.completed ? 'Done' : 'Planned'}
-              </strong>
-
-              {' by '}
-
-              <a href={`mailto:${user.email}`}>{user.name}</a>
+              </strong>{' '}
+              by <a href={`mailto:${user.email}`}>{user.name}</a>
             </p>
           </div>
         </div>
